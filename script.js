@@ -4,7 +4,7 @@ const MONTHS = ['JANUARI','FEBRUARI','MARET','APRIL','MEI','JUNI','JULI','AGUSTU
 const SHORT = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
 const TOK = {JAN:0,FEB:1,MAR:2,APR:3,MEI:4,MAY:4,JUN:5,JUL:6,AGU:7,AGT:7,AUG:7,SEP:8,SEPT:8,OKT:9,OCT:9,NOV:10,NOP:10,DES:11,DEC:11};
 const DEFAULT_CATS = ['BBM','JAJAN','MAKAN','MONTHLY NEED','KUOTA','KEPERLUAN'];
-const RESERVED = ['month','bulan','year','tahun','budget','total'];
+const RESERVED = ['month','bulan','year','tahun','budget','total','difference','selisih','sisa'];
 const COLORS = ['#F93976','#FF5A5F','#FF7E67','#FF9F70','#FFBC7A','#FFD884','#F48C8C','#FF8A1F'];
 const TIP = { tooltip: { callbacks: { label: c => ' ' + (c.dataset.label || c.label) + ': ' + rp(c.raw) } } };
 
