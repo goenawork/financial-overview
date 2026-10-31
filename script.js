@@ -35,12 +35,12 @@ function loadDashboardData() {
 // 2. Menyaring dan Memproses Data berdasarkan Bulan
 function processAndRenderData(selectedMonthName) {
     let totalExpenses = 0;
-    let categoryMap = {}; // Untuk menyimpan total pengeluaran per kategori
+    let categoryMap = {}; 
     let dateMap = {};
 
     const targetMonthStr = monthMap[selectedMonthName.toUpperCase()];
 
-    // Memproses Data Transaksi
+    // --- 1. Memproses Data Transaksi ---
     globalData.forEach(row => {
         let tgl = row.tanggal || "";
         let isMatchMonth = false;
@@ -66,28 +66,49 @@ function processAndRenderData(selectedMonthName) {
         }
     });
 
-    // Menghitung Total Budget dari Sheet BUDGET
+    // --- 2. Memproses Data Budget (Format Crosstab) ---
     let totalBudget = 0;
-    let categoryBudgetMap = {}; // Menyimpan budget per kategori
+    let categoryBudgetMap = {}; 
     
-    globalBudget.forEach(row => {
-      // Pastikan ada pengecekan bulan juga jika sheet budgetmu memisahkan per bulan
-      // Jika budget berlaku umum/tahunan, kita jumlahkan saja
-      let kat = (row.kategori || row.category || "").toUpperCase();
-      let budgStr = String(row.budget || row.anggaran || '0').replace(/[^0-9,-]+/g,"");
-      let budg = parseFloat(budgStr) || 0;
-      
-      if (kat && budg > 0) {
-        categoryBudgetMap[kat] = (categoryBudgetMap[kat] || 0) + budg;
-        totalBudget += budg;
-      }
+    // Cari baris bulan yang sesuai di data Table1
+    const bulanDipilih = selectedMonthName.toUpperCase();
+    
+    // Kita cari baris yang kolom pertamanya (month) cocok dengan bulan yang dipilih
+    let rowBudget = globalBudget.find(row => {
+        let monthDiSheet = (row.month || "").toUpperCase();
+        return monthDiSheet === bulanDipilih;
     });
+
+    if (rowBudget) {
+        // Ambil Total Budget dari kolom "budget"
+        let budgTotalStr = String(rowBudget.budget || '0').replace(/[^0-9,-]+/g,"");
+        totalBudget = parseFloat(budgTotalStr) || 0;
+
+        // Ambil budget untuk masing-masing kategori (BBM, JAJAN, MAKAN, dll)
+        const kategoriSpesifik = ['BBM', 'JAJAN', 'MAKAN', 'MONTHLY NEED', 'KUOTA', 'KEPERLUAN'];
+        
+        kategoriSpesifik.forEach(kat => {
+            // Karena di JSON key-nya otomatis huruf kecil dari Apps Script, kita ubah huruf kecil dulu
+            let key = kat.toLowerCase().replace(' ', ' '); 
+            // Namun, jika ada spasi, Apps Script mungkin memangkasnya, kita cek manual
+            
+            // Cara paling aman membaca properti:
+            let val = rowBudget[kat.toLowerCase()] || rowBudget[kat.toLowerCase().replace(' ', '')] || 0;
+            
+            let valStr = String(val).replace(/[^0-9,-]+/g,"");
+            let nominalBudg = parseFloat(valStr) || 0;
+            
+            if(nominalBudg > 0) {
+                 categoryBudgetMap[kat] = nominalBudg;
+            }
+        });
+    }
 
     // Menyiapkan Data untuk Chart
     const catLabels = Object.keys(categoryMap);
     const catData = Object.values(categoryMap);
     
-    // Palet warna khusus sesuai gambar (merah coral, jingga, peach)
+    // Palet warna khusus sesuai gambar
     const customColors = ['#F93976', '#FF5A5F', '#FF7E67', '#FF9F70', '#FFBC7A', '#FFD884', '#F48C8C'];
     const catColors = catLabels.map((_, i) => customColors[i % customColors.length]);
 
