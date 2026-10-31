@@ -1,28 +1,30 @@
+// GANTI DENGAN URL WEB APP KAMU YANG BARU
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw3biUBzG4Mh5f0Qt_Fv5b5GHCG4DN0_5J-rIJYT5XDnz2YYXHI4p6yog9qtxpuJ-Gi/exec';
 
 let globalData = [];
+let globalBudget = [];
 let donutChartInstance = null;
 let lineChartInstance = null;
 
-// Fungsi format Rupiah
 const formatRupiah = (angka) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
 };
 
-// Pemetaan nama bulan ke angka (untuk mencocokkan format tanggal YYYY-MM-DD dari form)
 const monthMap = {
     'JANUARI': '01', 'FEBRUARI': '02', 'MARET': '03', 'APRIL': '04',
     'MEI': '05', 'JUNI': '06', 'JULI': '07', 'AGUSTUS': '08',
     'SEPTEMBER': '09', 'OKTOBER': '10', 'NOVEMBER': '11', 'DESEMBER': '12'
 };
 
-// 1. Mengambil data dari Spreadsheet
+// 1. Mengambil data dari Spreadsheet (Transaksi & Budget)
 function loadDashboardData() {
     fetch(SCRIPT_URL)
         .then(response => response.json())
         .then(res => {
             if(res.status === 'sukses') {
                 globalData = res.data;
+                globalBudget = res.budgetData || []; // Menangkap data budget
+                
                 const selectedMonth = document.getElementById('month-selector').value;
                 processAndRenderData(selectedMonth);
             }
@@ -33,14 +35,17 @@ function loadDashboardData() {
 // 2. Menyaring dan Memproses Data berdasarkan Bulan
 function processAndRenderData(selectedMonthName) {
     let totalExpenses = 0;
-    let categoryMap = {};
+    let categoryMap = {}; // Untuk menyimpan total pengeluaran per kategori
     let dateMap = {};
 
+    const targetMonthStr = monthMap[selectedMonthName.toUpperCase()];
+
+    // Memproses Data Transaksi
     globalData.forEach(row => {
         let tgl = row.tanggal || "";
         let isMatchMonth = false;
 
-        // Mencocokkan format "1 Jan 2026" dengan pilihan dropdown (misal: "JANUARI" -> "JAN")
+        // Cek kecocokan bulan
         if (tgl.toUpperCase().includes(selectedMonthName.substring(0, 3))) {
             isMatchMonth = true; 
         }
@@ -49,44 +54,65 @@ function processAndRenderData(selectedMonthName) {
             let nominalStr = String(row.nominal || '0').replace(/[^0-9,-]+/g,"");
             let nominal = parseFloat(nominalStr) || 0;
 
-            // Mengecek kolom "category" (apakah "EXPENSES")
             let categoryType = (row.category || "").toUpperCase();
             
             if (categoryType === 'EXPENSES' || categoryType === 'PENGELUARAN') {
                 totalExpenses += nominal;
 
-                // Mengelompokkan grafik berdasarkan kolom "needs" (BBM, JAJAN, dll)
                 let needsKategori = (row.needs || 'Lainnya').toUpperCase();
-                
                 categoryMap[needsKategori] = (categoryMap[needsKategori] || 0) + nominal;
                 dateMap[tgl] = (dateMap[tgl] || 0) + nominal;
             }
         }
     });
 
+    // Menghitung Total Budget dari Sheet BUDGET
+    let totalBudget = 0;
+    let categoryBudgetMap = {}; // Menyimpan budget per kategori
+    
+    globalBudget.forEach(row => {
+      // Pastikan ada pengecekan bulan juga jika sheet budgetmu memisahkan per bulan
+      // Jika budget berlaku umum/tahunan, kita jumlahkan saja
+      let kat = (row.kategori || row.category || "").toUpperCase();
+      let budgStr = String(row.budget || row.anggaran || '0').replace(/[^0-9,-]+/g,"");
+      let budg = parseFloat(budgStr) || 0;
+      
+      if (kat && budg > 0) {
+        categoryBudgetMap[kat] = (categoryBudgetMap[kat] || 0) + budg;
+        totalBudget += budg;
+      }
+    });
+
+    // Menyiapkan Data untuk Chart
     const catLabels = Object.keys(categoryMap);
     const catData = Object.values(categoryMap);
-    const catColors = catLabels.map((_, i) => `hsl(${i * 360 / Math.max(catLabels.length, 1)}, 70%, 60%)`);
+    
+    // Palet warna khusus sesuai gambar (merah coral, jingga, peach)
+    const customColors = ['#F93976', '#FF5A5F', '#FF7E67', '#FF9F70', '#FFBC7A', '#FFD884', '#F48C8C'];
+    const catColors = catLabels.map((_, i) => customColors[i % customColors.length]);
 
     const dateLabels = Object.keys(dateMap).sort(); 
     const dateData = dateLabels.map(d => dateMap[d]);
 
-    renderDashboard(totalExpenses, catLabels, catData, catColors, dateLabels, dateData, categoryMap, dateMap);
+    renderDashboard(totalExpenses, totalBudget, catLabels, catData, catColors, dateLabels, dateData, categoryMap, dateMap, categoryBudgetMap);
 }
 
 // 3. Menampilkan ke Antarmuka
-function renderDashboard(totalExpenses, catLabels, catData, catColors, dateLabels, dateData, categoryMap, dateMap) {
+function renderDashboard(totalExpenses, totalBudget, catLabels, catData, catColors, dateLabels, dateData, categoryMap, dateMap, categoryBudgetMap) {
+    
+    // Update Top Stats
     document.getElementById('total-expenses').innerText = formatRupiah(totalExpenses);
+    document.getElementById('month-budget').innerText = formatRupiah(totalBudget);
     
-    // Budget Sementara
-    const asumsiBudget = 1000000;
-    document.getElementById('month-budget').innerText = formatRupiah(asumsiBudget);
-    let persentase = totalExpenses > 0 ? Math.round((totalExpenses / asumsiBudget) * 100) : 0;
+    let recentBudget = totalBudget - totalExpenses;
+    document.getElementById('recent-budget').innerText = formatRupiah(recentBudget);
     
-    document.getElementById('budget-progress').style.width = Math.min(persentase, 100) + '%';
-    document.getElementById('progress-percentage').innerText = persentase + '%';
+    let persentaseTotal = totalBudget > 0 ? Math.round((totalExpenses / totalBudget) * 100) : 0;
+    
+    document.getElementById('budget-progress').style.width = Math.min(persentaseTotal, 100) + '%';
+    document.getElementById('progress-percentage').innerText = persentaseTotal + '%';
 
-    // Chart.js - Donut
+    // Update Donut Chart dengan warna baru
     const ctxDonut = document.getElementById('donutChart').getContext('2d');
     if(donutChartInstance) donutChartInstance.destroy();
     
@@ -94,29 +120,48 @@ function renderDashboard(totalExpenses, catLabels, catData, catColors, dateLabel
         donutChartInstance = new Chart(ctxDonut, {
             type: 'doughnut',
             data: { labels: catLabels, datasets: [{ data: catData, backgroundColor: catColors, borderWidth: 0 }] },
-            options: { cutout: '60%', responsive: true, plugins: { legend: { position: 'right' } } }
+            options: { cutout: '60%', responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
         });
     }
 
-    // Chart.js - Line
+    // Update Line Chart
     const ctxLine = document.getElementById('lineChart').getContext('2d');
     if(lineChartInstance) lineChartInstance.destroy();
     
     if (dateLabels.length > 0) {
         lineChartInstance = new Chart(ctxLine, {
             type: 'line',
-            data: { labels: dateLabels, datasets: [{ label: 'EXPENSES', data: dateData, borderColor: '#ff4081', backgroundColor: 'rgba(255, 64, 129, 0.2)', fill: true, tension: 0.1 }] }
+            data: { labels: dateLabels, datasets: [{ label: 'EXPENSES', data: dateData, borderColor: '#F93976', backgroundColor: 'rgba(249, 57, 118, 0.2)', fill: true, tension: 0.1 }] },
+            options: { responsive: true, maintainAspectRatio: false }
         });
     }
 
-    // Tabel Kategori
+    // Update Tabel Kategori dengan perhitungan Budget, Saldo, dan Persentase
     const catTbody = document.querySelector('#category-table tbody');
     catTbody.innerHTML = '';
-    for (let cat in categoryMap) {
-        catTbody.innerHTML += `<tr><td>${cat}</td><td>${formatRupiah(categoryMap[cat])}</td><td>-</td><td>-</td><td>-</td></tr>`;
-    }
+    
+    // Gabungkan kategori yang ada di transaksi maupun di budget
+    const allCategories = new Set([...Object.keys(categoryMap), ...Object.keys(categoryBudgetMap)]);
 
-    // Tabel Tanggal
+    allCategories.forEach(cat => {
+        if(cat === "LAINNYA" && !categoryMap[cat]) return; // Skip "Lainnya" jika kosong
+        
+        let exp = categoryMap[cat] || 0;
+        let bud = categoryBudgetMap[cat] || 0;
+        let sal = bud - exp;
+        let pct = bud > 0 ? Math.round((exp / bud) * 100) : 0;
+
+        catTbody.innerHTML += `
+          <tr>
+            <td>${cat}</td>
+            <td>${formatRupiah(exp)}</td>
+            <td>${bud > 0 ? formatRupiah(bud) : '-'}</td>
+            <td>${bud > 0 ? formatRupiah(sal) : '-'}</td>
+            <td>${bud > 0 ? pct + '%' : '-'}</td>
+          </tr>`;
+    });
+
+    // Update Tabel Tanggal
     const dateTbody = document.querySelector('#date-table tbody');
     dateTbody.innerHTML = '';
     for (let date of dateLabels) {
@@ -124,13 +169,15 @@ function renderDashboard(totalExpenses, catLabels, catData, catColors, dateLabel
     }
 }
 
-// Event Listeners
+// Event Listeners untuk Form (Sesuai dengan ID pada HTML yang baru)
 document.getElementById('transaction-form').addEventListener('submit', function(e) {
   e.preventDefault();
   const btn = document.getElementById('btn-submit');
-  btn.innerText = 'Saving...'; btn.disabled = true;
+  const originalText = btn.innerText;
+  btn.innerText = 'Saving...'; 
+  btn.disabled = true;
 
- const data = {
+  const data = {
     tanggal: document.getElementById('date').value,
     needs: document.getElementById('needs').value.toUpperCase(),
     nominal: document.getElementById('amount').value,
@@ -145,14 +192,18 @@ document.getElementById('transaction-form').addEventListener('submit', function(
   }).then(() => {
     alert('Transaction successfully saved!');
     document.getElementById('transaction-form').reset();
-    btn.innerText = 'Save Transaction'; btn.disabled = false;
-    loadDashboardData(); // Refresh data otomatis
+    btn.innerText = originalText; 
+    btn.disabled = false;
+    loadDashboardData(); 
+  }).catch(err => {
+    alert('Failed to save. Please try again.');
+    btn.innerText = originalText; 
+    btn.disabled = false;
   });
 });
 
 document.addEventListener('DOMContentLoaded', loadDashboardData);
 
-// Memperbarui dashboard saat bulan diganti
 document.getElementById('month-selector').addEventListener('change', (e) => {
     processAndRenderData(e.target.value);
 });
