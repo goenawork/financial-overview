@@ -1,4 +1,4 @@
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwLrdNNhhb12QDqoGsqXfyA7ZL0Lf7tc3bQeV1G55eL9wPBzSZjMkidFQGZeTUPrK4f/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzVDBuF_JUBYlYm1UfXjgpM4GnJbMBKThd1oOWqiHbVmCdwFPt3mFHY17riszFoQZ_A/exec';
 
 let globalData = [];
 let donutChartInstance = null;
