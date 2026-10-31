@@ -3,13 +3,101 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>My Financial Record</title>
+  <title>Financial Overview Dashboard</title>
   <link rel="stylesheet" href="style.css">
+  <!-- Memuat Chart.js untuk grafik -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-  <h2>💸 Financial Dashboard</h2>
+  <div class="header-container">
+    <h1 class="main-title">FINANCIAL OVERVIEW DASHBOARD</h1>
+    <div class="filter-group">
+      <div class="filter-item">
+        <label>YEAR</label>
+        <span>2026</span>
+      </div>
+      <div class="filter-item">
+        <label>MONTH</label>
+        <select id="month-selector">
+          <option value="OKTOBER">OKTOBER</option>
+          <option value="NOVEMBER">NOVEMBER</option>
+          <!-- Tambahkan bulan lain sesuai kebutuhan -->
+        </select>
+      </div>
+    </div>
+  </div>
 
-  <div class="card">
+  <!-- Ringkasan Angka -->
+  <div class="summary-cards">
+    <div class="card expenses-card">
+      <div class="card-header">TOTAL EXPENSES</div>
+      <div class="card-value" id="total-expenses">Rp0</div>
+    </div>
+    <div class="right-cards">
+      <div class="card small-card">
+        <div class="card-header">THIS MONTH'S BUDGET</div>
+        <div class="card-value" id="month-budget">Rp0</div>
+      </div>
+      <div class="card small-card">
+        <div class="card-header">RECENT BUDGET</div>
+        <div class="card-value" id="recent-budget">Rp0</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="progress-bar-container">
+    <div class="progress-bar" id="budget-progress" style="width: 0%;"></div>
+    <span class="progress-text" id="progress-percentage">0%</span>
+  </div>
+
+  <!-- Grafik -->
+  <div class="charts-container">
+    <div class="chart-box">
+      <canvas id="donutChart"></canvas>
+    </div>
+    <div class="chart-box">
+      <h3>TOTAL PENGELUARAN vs TANGGAL</h3>
+      <canvas id="lineChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Tabel Ringkasan Kategori -->
+  <div class="table-container">
+    <h3 class="table-title">TRANSACTION SUMMARY BY CATEGORY</h3>
+    <table id="category-table">
+      <thead>
+        <tr>
+          <th>CATEGORY</th>
+          <th>EXPENSES</th>
+          <th>BUDGET</th>
+          <th>SALDO</th>
+          <th>PERSENTASE</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Data akan dimuat melalui JavaScript -->
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Tabel Pengeluaran per Tanggal -->
+  <div class="table-container half-width">
+    <h3 class="table-title">EXPENSES BY DATE</h3>
+    <table id="date-table">
+      <thead>
+        <tr>
+          <th>DATE</th>
+          <th>TOTAL</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Data akan dimuat melalui JavaScript -->
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Form Input (Tetap dipertahankan di bagian bawah) -->
+  <div class="card form-card">
     <h3>Input New Transaction</h3>
     <form id="transaction-form">
       <input type="date" id="date" required>
@@ -21,12 +109,6 @@
       </select>
       <button type="submit" id="btn-submit">Save Transaction</button>
     </form>
-  </div>
-
-  <div class="card">
-    <h3>Dashboard Summary</h3>
-    <button type="button" id="btn-load" class="btn-success">🔄 Load Google Sheets Data</button>
-    <div id="dashboard-result"><i>No data loaded yet.</i></div>
   </div>
 
   <script src="script.js"></script>
