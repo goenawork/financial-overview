@@ -110,11 +110,12 @@
     <h3>Input New Transaction</h3>
     <form id="transaction-form">
       <input type="date" id="date" required>
-      <input type="text" id="description" placeholder="Description (e.g., Lunch)" required>
+      <input type="text" id="needs" placeholder="Needs (e.g., JAJAN, BBM)" required>
       <input type="number" id="amount" placeholder="Amount (e.g., 25000)" required>
-      <select id="type">
-        <option value="Expense">Expense</option>
-        <option value="Income">Income</option>
+      <input type="text" id="description" placeholder="Description (e.g., Batagor)" required>
+      <select id="category">
+        <option value="EXPENSES">EXPENSES</option>
+        <option value="SAVING">SAVING</option>
       </select>
       <button type="submit" id="btn-submit">Save Transaction</button>
     </form>
