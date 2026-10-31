@@ -1,4 +1,4 @@
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzpyYWUIBRcX0Wh02dL4QXpgXotVIe_OLx8_iBWMgDJI9k3JZ6fNy_4lHhTH4f3Dg-J/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxQwaWAf0t_Krmsn7VU__NRri9kQf28ELgrw_2V58jl-yJe2ewiEmwmLyFfPsabslHU/exec';
 const ACCOUNT_NAME = 'Aang Gunawan';
 const MONTHS = ['JANUARI','FEBRUARI','MARET','APRIL','MEI','JUNI','JULI','AGUSTUS','SEPTEMBER','OKTOBER','NOVEMBER','DESEMBER'];
 const SHORT = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
