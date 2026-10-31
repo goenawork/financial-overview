@@ -1,5 +1,5 @@
 // GANTI DENGAN URL WEB APP KAMU YANG BARU
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxicjbjaoKjvVCAKZp_rOSs-tCO0iaUrP0YmD4ULB7q-fbiC_zeRhk79-LxlWjGuEbg/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyuv5Dfu-EX211dX0mSSDUk3lvAnxd6814YYQ5dsNxjKmtaMknhcv1yQhd34KWPTHw/exec';
 
 let globalData = [];
 let globalBudget = [];
