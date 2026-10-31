@@ -1,230 +1,234 @@
-// GANTI DENGAN URL WEB APP KAMU YANG BARU
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyxQ3yV4ADGlTJGL7SOdkFVRdkKXTC4CpnWM0c8ZbjX-duAuYftZHnHiqcTXHsvSUnO/exec';
+const ACCOUNT_NAME = 'Aang Gunawan';
+const MONTHS = ['JANUARI','FEBRUARI','MARET','APRIL','MEI','JUNI','JULI','AGUSTUS','SEPTEMBER','OKTOBER','NOVEMBER','DESEMBER'];
+const SHORT = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+const TOK = {JAN:0,FEB:1,MAR:2,APR:3,MEI:4,MAY:4,JUN:5,JUL:6,AGU:7,AGT:7,AUG:7,SEP:8,SEPT:8,OKT:9,OCT:9,NOV:10,NOP:10,DES:11,DEC:11};
+const DEFAULT_CATS = ['BBM','JAJAN','MAKAN','MONTHLY NEED','KUOTA','KEPERLUAN'];
+const RESERVED = ['month','bulan','year','tahun','budget','total'];
+const COLORS = ['#F93976','#FF5A5F','#FF7E67','#FF9F70','#FFBC7A','#FFD884','#F48C8C','#FF8A1F'];
+const TIP = { tooltip: { callbacks: { label: c => ' ' + (c.dataset.label || c.label) + ': ' + rp(c.raw) } } };
 
-let globalData = [];
-let globalBudget = [];
-let donutChartInstance = null;
-let lineChartInstance = null;
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const norm = s => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
+const pad = n => String(n).padStart(2, '0');
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const rp = n => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n);
+const pick = (o, names) => { const k = Object.keys(o).find(k => names.includes(norm(k))); return k === undefined ? undefined : o[k]; };
+const num = v => typeof v === 'number' ? v : (parseFloat(String(v || '0').replace(/[^0-9,-]+/g, '')) || 0);
+const sum = a => a.reduce((x, y) => x + y, 0);
 
-const formatRupiah = (angka) => {
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
-};
+let globalData = [], globalBudget = [], backendCats = null;
+const now = new Date();
+const state = { view: 'home', year: now.getFullYear(), month: now.getMonth() };
+const charts = {};
 
-const monthMap = {
-    'JANUARI': '01', 'FEBRUARI': '02', 'MARET': '03', 'APRIL': '04',
-    'MEI': '05', 'JUNI': '06', 'JULI': '07', 'AGUSTUS': '08',
-    'SEPTEMBER': '09', 'OKTOBER': '10', 'NOVEMBER': '11', 'DESEMBER': '12'
-};
-
-// 1. Mengambil data dari Spreadsheet (Transaksi & Budget)
-function loadDashboardData() {
-    fetch(SCRIPT_URL)
-        .then(response => response.json())
-        .then(res => {
-            if(res.status === 'sukses') {
-                globalData = res.data;
-                globalBudget = res.budgetData || []; // Menangkap data budget
-                
-                const selectedMonth = document.getElementById('month-selector').value;
-                processAndRenderData(selectedMonth);
-            }
-        })
-        .catch(err => console.error('Gagal mengambil data:', err));
+/* ---------- Helper tanggal & data ---------- */
+function monthIdx(v) {
+  if (v == null) return -1;
+  const s = String(v).trim().toUpperCase();
+  if (/^\d{1,2}$/.test(s)) { const n = +s - 1; return n >= 0 && n < 12 ? n : -1; }
+  const i = MONTHS.indexOf(s); if (i >= 0) return i;
+  const t = TOK[s.slice(0, 4)] ?? TOK[s.slice(0, 3)];
+  return t === undefined ? -1 : t;
 }
-
-// 2. Menyaring dan Memproses Data berdasarkan Bulan
-function processAndRenderData(selectedMonthName) {
-    let totalExpenses = 0;
-    let categoryMap = {}; 
-    let dateMap = {};
-
-    const targetMonthStr = monthMap[selectedMonthName.toUpperCase()];
-
-    // --- 1. Memproses Data Transaksi ---
-    globalData.forEach(row => {
-        let tgl = row.tanggal || "";
-        let isMatchMonth = false;
-
-        // Cek kecocokan bulan
-        if (tgl.toUpperCase().includes(selectedMonthName.substring(0, 3))) {
-            isMatchMonth = true; 
-        }
-
-        if (isMatchMonth) {
-            let nominalStr = String(row.nominal || '0').replace(/[^0-9,-]+/g,"");
-            let nominal = parseFloat(nominalStr) || 0;
-
-            let categoryType = (row.category || "").toUpperCase();
-            
-            if (categoryType === 'EXPENSES' || categoryType === 'PENGELUARAN') {
-                totalExpenses += nominal;
-
-                let needsKategori = (row.needs || 'Lainnya').toUpperCase();
-                categoryMap[needsKategori] = (categoryMap[needsKategori] || 0) + nominal;
-                dateMap[tgl] = (dateMap[tgl] || 0) + nominal;
-            }
-        }
-    });
-
-    // --- 2. Memproses Data Budget (Format Crosstab) ---
-    let totalBudget = 0;
-    let categoryBudgetMap = {}; 
-    
-    // Cari baris bulan yang sesuai di data Table1
-    const bulanDipilih = selectedMonthName.toUpperCase();
-    
-    // Kita cari baris yang kolom pertamanya (month) cocok dengan bulan yang dipilih
-    let rowBudget = globalBudget.find(row => {
-        let monthDiSheet = (row.month || "").toUpperCase();
-        return monthDiSheet === bulanDipilih;
-    });
-
-    if (rowBudget) {
-        // Ambil Total Budget dari kolom "budget"
-        let budgTotalStr = String(rowBudget.budget || '0').replace(/[^0-9,-]+/g,"");
-        totalBudget = parseFloat(budgTotalStr) || 0;
-
-        // Ambil budget untuk masing-masing kategori (BBM, JAJAN, MAKAN, dll)
-        const kategoriSpesifik = ['BBM', 'JAJAN', 'MAKAN', 'MONTHLY NEED', 'KUOTA', 'KEPERLUAN'];
-        
-        kategoriSpesifik.forEach(kat => {
-            // Karena di JSON key-nya otomatis huruf kecil dari Apps Script, kita ubah huruf kecil dulu
-            let key = kat.toLowerCase().replace(' ', ' '); 
-            // Namun, jika ada spasi, Apps Script mungkin memangkasnya, kita cek manual
-            
-            // Cara paling aman membaca properti:
-            let val = rowBudget[kat.toLowerCase()] || rowBudget[kat.toLowerCase().replace(' ', '')] || 0;
-            
-            let valStr = String(val).replace(/[^0-9,-]+/g,"");
-            let nominalBudg = parseFloat(valStr) || 0;
-            
-            if(nominalBudg > 0) {
-                 categoryBudgetMap[kat] = nominalBudg;
-            }
-        });
-    }
-
-    // Menyiapkan Data untuk Chart
-    const catLabels = Object.keys(categoryMap);
-    const catData = Object.values(categoryMap);
-    
-    // Palet warna khusus sesuai gambar
-    const customColors = ['#F93976', '#FF5A5F', '#FF7E67', '#FF9F70', '#FFBC7A', '#FFD884', '#F48C8C'];
-    const catColors = catLabels.map((_, i) => customColors[i % customColors.length]);
-
-    const dateLabels = Object.keys(dateMap).sort(); 
-    const dateData = dateLabels.map(d => dateMap[d]);
-
-    renderDashboard(totalExpenses, totalBudget, catLabels, catData, catColors, dateLabels, dateData, categoryMap, dateMap, categoryBudgetMap);
+function parseDate(raw) {
+  if (raw == null || raw === '') return null;
+  const s = String(raw).trim(); let m;
+  const loc = d => isNaN(d) ? null : { y: d.getFullYear(), m: d.getMonth(), d: d.getDate() };
+  if (/T.*(Z|[+-]\d\d:?\d\d)$/.test(s)) return loc(new Date(s));
+  if (m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/)) return { y: +m[1], m: m[2] - 1, d: +m[3] };
+  if (m = s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})$/)) return { y: m[3].length == 2 ? 2000 + +m[3] : +m[3], m: m[2] - 1, d: +m[1] };
+  const w = (s.match(/[A-Za-z]+/g) || []).map(monthIdx).find(i => i >= 0), n = (s.match(/\d+/g) || []).map(Number);
+  if (w !== undefined) { const y = n.find(x => x >= 100), d = n.find(x => x >= 1 && x <= 31); if (d) return { y: y || null, m: w, d }; }
+  return loc(new Date(s));
 }
-
-// 3. Menampilkan ke Antarmuka
-function renderDashboard(totalExpenses, totalBudget, catLabels, catData, catColors, dateLabels, dateData, categoryMap, dateMap, categoryBudgetMap) {
-    
-    // Update Top Stats
-    document.getElementById('total-expenses').innerText = formatRupiah(totalExpenses);
-    document.getElementById('month-budget').innerText = formatRupiah(totalBudget);
-    
-    let recentBudget = totalBudget - totalExpenses;
-    document.getElementById('recent-budget').innerText = formatRupiah(recentBudget);
-    
-    let persentaseTotal = totalBudget > 0 ? Math.round((totalExpenses / totalBudget) * 100) : 0;
-    
-    document.getElementById('budget-progress').style.width = Math.min(persentaseTotal, 100) + '%';
-    document.getElementById('progress-percentage').innerText = persentaseTotal + '%';
-
-    // Update Donut Chart dengan warna baru
-    const ctxDonut = document.getElementById('donutChart').getContext('2d');
-    if(donutChartInstance) donutChartInstance.destroy();
-    
-    if (catLabels.length > 0) {
-        donutChartInstance = new Chart(ctxDonut, {
-            type: 'doughnut',
-            data: { labels: catLabels, datasets: [{ data: catData, backgroundColor: catColors, borderWidth: 0 }] },
-            options: { cutout: '60%', responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
-        });
-    }
-
-    // Update Line Chart
-    const ctxLine = document.getElementById('lineChart').getContext('2d');
-    if(lineChartInstance) lineChartInstance.destroy();
-    
-    if (dateLabels.length > 0) {
-        lineChartInstance = new Chart(ctxLine, {
-            type: 'line',
-            data: { labels: dateLabels, datasets: [{ label: 'EXPENSES', data: dateData, borderColor: '#F93976', backgroundColor: 'rgba(249, 57, 118, 0.2)', fill: true, tension: 0.1 }] },
-            options: { responsive: true, maintainAspectRatio: false }
-        });
-    }
-
-    // Update Tabel Kategori dengan perhitungan Budget, Saldo, dan Persentase
-    const catTbody = document.querySelector('#category-table tbody');
-    catTbody.innerHTML = '';
-    
-    // Gabungkan kategori yang ada di transaksi maupun di budget
-    const allCategories = new Set([...Object.keys(categoryMap), ...Object.keys(categoryBudgetMap)]);
-
-    allCategories.forEach(cat => {
-        if(cat === "LAINNYA" && !categoryMap[cat]) return; // Skip "Lainnya" jika kosong
-        
-        let exp = categoryMap[cat] || 0;
-        let bud = categoryBudgetMap[cat] || 0;
-        let sal = bud - exp;
-        let pct = bud > 0 ? Math.round((exp / bud) * 100) : 0;
-
-        catTbody.innerHTML += `
-          <tr>
-            <td>${cat}</td>
-            <td>${formatRupiah(exp)}</td>
-            <td>${bud > 0 ? formatRupiah(bud) : '-'}</td>
-            <td>${bud > 0 ? formatRupiah(sal) : '-'}</td>
-            <td>${bud > 0 ? pct + '%' : '-'}</td>
-          </tr>`;
-    });
-
-    // Update Tabel Tanggal
-    const dateTbody = document.querySelector('#date-table tbody');
-    dateTbody.innerHTML = '';
-    for (let date of dateLabels) {
-        dateTbody.innerHTML += `<tr><td>${date}</td><td>${formatRupiah(dateMap[date])}</td></tr>`;
-    }
-}
-
-// Event Listeners untuk Form (Sesuai dengan ID pada HTML yang baru)
-document.getElementById('transaction-form').addEventListener('submit', function(e) {
-  e.preventDefault();
-  const btn = document.getElementById('btn-submit');
-  const originalText = btn.innerText;
-  btn.innerText = 'Saving...'; 
-  btn.disabled = true;
-
-  const data = {
-    tanggal: document.getElementById('date').value,
-    needs: document.getElementById('needs').value.toUpperCase(),
-    nominal: document.getElementById('amount').value,
-    keterangan: document.getElementById('description').value,
-    category: document.getElementById('category').value
-  };
-
-  fetch(SCRIPT_URL, {
-    method: 'POST', mode: 'no-cors',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data)
-  }).then(() => {
-    alert('Transaction successfully saved!');
-    document.getElementById('transaction-form').reset();
-    btn.innerText = originalText; 
-    btn.disabled = false;
-    loadDashboardData(); 
-  }).catch(err => {
-    alert('Failed to save. Please try again.');
-    btn.innerText = originalText; 
-    btn.disabled = false;
+function txs() {
+  return globalData.map(r => {
+    const dt = parseDate(pick(r, ['tanggal', 'date'])) || { y: null, m: -1, d: 0 };
+    const c = String(pick(r, ['category', 'kategori']) || '').toUpperCase();
+    return { ...dt, needs: String(pick(r, ['needs']) || 'LAINNYA').toUpperCase(), desc: pick(r, ['keterangan', 'description', 'deskripsi']) || '',
+      amt: num(pick(r, ['nominal', 'amount'])), type: /SAVING|TABUNGAN/.test(c) ? 'SAVING' : (/EXPENSES|PENGELUARAN/.test(c) ? 'EXPENSES' : '') };
   });
+}
+const inPeriod = t => t.m === state.month && (t.y === null || t.y === state.year);
+
+function budgetFor(y, m) {
+  let rows = globalBudget.filter(r => monthIdx(pick(r, ['month', 'bulan'])) === m);
+  if (rows.some(r => { const v = pick(r, ['year', 'tahun']); return v !== undefined && v !== ''; })) rows = rows.filter(r => +pick(r, ['year', 'tahun']) === y);
+  const r = rows[0]; if (!r) return { found: false, total: 0, cats: {} };
+  const cats = {};
+  Object.keys(r).forEach(k => { if (!RESERVED.includes(norm(k)) && num(r[k]) > 0) cats[norm(k)] = num(r[k]); });
+  return { found: true, total: num(pick(r, ['budget', 'total'])) || sum(Object.values(cats)), cats };
+}
+function categories() {
+  if (backendCats) return backendCats;
+  const l = [...DEFAULT_CATS];
+  globalBudget.forEach(r => Object.keys(r).forEach(k => { if (!RESERVED.includes(norm(k)) && !l.some(c => norm(c) === norm(k))) l.push(k.toUpperCase()); }));
+  return l;
+}
+
+/* ---------- UI umum ---------- */
+function chart(id, cfg) {
+  charts[id]?.destroy();
+  cfg.options = { responsive: true, maintainAspectRatio: false, ...cfg.options };
+  charts[id] = new Chart($('#' + id), cfg);
+}
+function toast(m) { const t = $('#toast'); t.textContent = m; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => t.hidden = true, 2800); }
+const post = body => fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) });
+
+function buildPeriod() {
+  const ys = [2026, 2027, state.year, now.getFullYear() + 1, ...txs().map(t => t.y).filter(Boolean)];
+  const years = []; for (let y = Math.min(...ys); y <= Math.max(...ys); y++) years.push(y);
+  $$('[data-period]').forEach(el => {
+    el.innerHTML = `<div class="filter-group"><label>Tahun</label><select class="year-selector">${years.map(y => `<option>${y}</option>`).join('')}</select></div>` +
+      (el.dataset.period === 'ym' ? `<div class="filter-group"><label>Bulan</label><select class="month-selector">${MONTHS.map((m, i) => `<option value="${i}">${m}</option>`).join('')}</select></div>` : '');
+  });
+  syncPeriod();
+}
+function syncPeriod() { $$('.year-selector').forEach(s => s.value = state.year); $$('.month-selector').forEach(s => s.value = state.month); }
+document.addEventListener('change', e => {
+  if (e.target.matches('.year-selector')) state.year = +e.target.value;
+  else if (e.target.matches('.month-selector')) state.month = +e.target.value;
+  else return;
+  syncPeriod(); render();
 });
 
-document.addEventListener('DOMContentLoaded', loadDashboardData);
+function setView(v) {
+  state.view = v;
+  $$('.view').forEach(e => e.hidden = e.id !== 'view-' + v);
+  $$('.nav-item[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === v));
+  render(); scrollTo(0, 0);
+}
+function render() { ({ home: renderHome, transaction: renderTx, budget: renderBudget, akun: renderAkun })[state.view](); }
 
-document.getElementById('month-selector').addEventListener('change', (e) => {
-    processAndRenderData(e.target.value);
+/* ---------- HOME ---------- */
+function renderHome() {
+  const T = txs().filter(t => inPeriod(t) && t.type === 'EXPENSES'), b = budgetFor(state.year, state.month);
+  const cm = {}, dm = {};
+  T.forEach(t => { cm[t.needs] = (cm[t.needs] || 0) + t.amt; dm[t.d] = (dm[t.d] || 0) + t.amt; });
+  const total = sum(T.map(t => t.amt)), pct = b.total > 0 ? Math.round(total / b.total * 100) : 0;
+  $('#total-expenses').textContent = rp(total);
+  $('#month-budget').textContent = rp(b.total);
+  $('#recent-budget').textContent = rp(b.total - total);
+  $('#progress-percentage').textContent = pct + '%';
+  $('#budget-progress').style.width = Math.min(pct, 100) + '%';
+  $('#budget-note').hidden = b.found;
+
+  const ce = Object.entries(cm).sort((a, b) => b[1] - a[1]); // urut nominal terbesar
+  chart('donutChart', { type: 'doughnut', data: { labels: ce.map(e => e[0]), datasets: [{ data: ce.map(e => e[1]), backgroundColor: ce.map((_, i) => COLORS[i % COLORS.length]), borderWidth: 0 }] },
+    options: { cutout: '60%', plugins: { ...TIP, legend: { position: 'right' } } } });
+  const days = Object.keys(dm).map(Number).sort((a, b) => a - b), lab = days.map(d => pad(d) + ' ' + SHORT[state.month]);
+  chart('lineChart', { type: 'line', data: { labels: lab, datasets: [{ label: 'EXPENSES', data: days.map(d => dm[d]), borderColor: '#F93976', backgroundColor: 'rgba(249,57,118,.2)', fill: true, tension: .1 }] }, options: { plugins: TIP } });
+
+  const names = new Set([...Object.keys(cm), ...categories().filter(c => b.cats[norm(c)])]);
+  const rows = [...names].filter(c => c !== 'LAINNYA' || cm[c]).map(c => ({ c, e: cm[c] || 0, bg: b.cats[norm(c)] || 0 })).sort((x, y) => y.e - x.e || y.bg - x.bg);
+  $('#category-table tbody').innerHTML = rows.map(({ c, e, bg }) => {
+    const p = bg ? Math.round(e / bg * 100) : 0;
+    return `<tr><td>${esc(c)}</td><td data-label="Expenses">${rp(e)}</td><td data-label="Budget">${bg ? rp(bg) : '-'}</td>
+      <td data-label="Saldo" class="${bg && e > bg ? 'neg' : ''}">${bg ? rp(bg - e) : '-'}</td>
+      <td data-label="Persentase">${bg ? `<span class="mini"><i style="width:${Math.min(p, 100)}%"></i></span>${p}%` : '-'}</td></tr>`;
+  }).join('');
+  $('#date-table tbody').innerHTML = days.map((d, i) => `<tr><td>${lab[i]}</td><td data-label="Total">${rp(dm[d])}</td></tr>`).join('');
+}
+
+/* ---------- TRANSACTION ---------- */
+function renderTx() {
+  const T = txs().filter(inPeriod).reverse().sort((a, b) => b.d - a.d);
+  const ex = sum(T.filter(t => t.type === 'EXPENSES').map(t => t.amt)), sv = sum(T.filter(t => t.type === 'SAVING').map(t => t.amt));
+  $('#tx-summary').innerHTML = `<div class="stat-card primary-card"><h3>Expenses</h3><h2>${rp(ex)}</h2></div><div class="stat-card"><h3>Saving</h3><h2>${rp(sv)}</h2></div><div class="stat-card"><h3>Jumlah Transaksi</h3><h2>${T.length}</h2></div>`;
+  let html = '', last = null;
+  T.forEach(t => {
+    if (t.d !== last) { last = t.d; html += `<div class="tx-day">${new Date(t.y || state.year, t.m, t.d).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</div>`; }
+    const s = t.type === 'SAVING';
+    html += `<div class="tx"><div><b>${esc(t.desc)}</b><small>${esc(t.needs)} · ${t.type || '-'}</small></div><span class="${s ? 'pos' : 'neg'}">${s ? '+' : '-'}${rp(t.amt)}</span></div>`;
+  });
+  $('#tx-list').innerHTML = html || '<p class="note">Belum ada transaksi di bulan ini.</p>';
+}
+
+/* ---------- BUDGET ---------- */
+function renderBudget() {
+  const b = budgetFor(state.year, state.month);
+  $('#budget-card').innerHTML = `<h3>Budget ${MONTHS[state.month]} ${state.year}</h3>
+    <div class="input-group"><label>Total budget bulan ini</label><input type="number" id="b-total" inputmode="numeric" value="${b.total || ''}" placeholder="0"></div>
+    <h3 class="sub">Budget per kategori</h3>
+    ${categories().map(c => `<div class="cat-row"><span>${esc(c)}</span><input type="number" inputmode="numeric" data-cat="${esc(c)}" value="${b.cats[norm(c)] || ''}" placeholder="0">
+      <button class="icon-btn" data-edit="${esc(c)}" aria-label="Ubah">✎</button><button class="icon-btn" data-del="${esc(c)}" aria-label="Hapus">🗑</button></div>`).join('')}
+    <div class="cat-row"><input id="new-cat" placeholder="Kategori baru"><button class="btn-sm" id="add-cat">Tambah</button></div>
+    <button class="btn-submit" id="save-budget">Simpan Budget</button>`;
+}
+function ready() { if (!backendCats) { toast('Apps Script belum diperbarui (pakai Code.gs terbaru)'); return false; } return true; }
+function afterChange(msg) { toast(msg); renderBudget(); setTimeout(loadDashboardData, 1500); }
+
+$('#budget-card').addEventListener('click', e => {
+  const t = e.target.closest('button'); if (!t || !ready()) return;
+  if (t.id === 'add-cat') {
+    const name = $('#new-cat').value.trim().toUpperCase();
+    if (!name || categories().some(c => norm(c) === norm(name))) return toast('Nama kosong atau sudah ada');
+    post({ action: 'addCategory', name }); backendCats.push(name); afterChange('Kategori ditambahkan');
+  } else if (t.dataset.edit) {
+    const old = t.dataset.edit, nn = (prompt('Nama baru untuk kategori ' + old, old) || '').trim().toUpperCase();
+    if (!nn || nn === old) return;
+    post({ action: 'renameCategory', oldName: old, newName: nn }); backendCats = backendCats.map(c => c === old ? nn : c); afterChange('Kategori diubah');
+  } else if (t.dataset.del) {
+    const c = t.dataset.del; if (!confirm(`Hapus kategori ${c}? Budget kategori ini ikut terhapus (transaksi lama tetap ada).`)) return;
+    post({ action: 'deleteCategory', name: c }); backendCats = backendCats.filter(x => x !== c); afterChange('Kategori dihapus');
+  } else if (t.id === 'save-budget') {
+    const cats = {}; $$('#budget-card [data-cat]').forEach(i => cats[i.dataset.cat] = +i.value || 0);
+    const total = +$('#b-total').value || sum(Object.values(cats));
+    post({ action: 'saveBudget', month: MONTHS[state.month], year: state.year, budget: total, categories: cats });
+    const row = { month: MONTHS[state.month], year: state.year, budget: total }; Object.keys(cats).forEach(k => row[k.toLowerCase()] = cats[k]);
+    globalBudget = globalBudget.filter(r => monthIdx(pick(r, ['month', 'bulan'])) !== state.month).concat(row);
+    afterChange('Budget disimpan');
+  }
 });
+
+/* ---------- AKUN ---------- */
+function renderAkun() {
+  const T = txs(), E = T.filter(t => t.type === 'EXPENSES'), sv = sum(T.filter(t => t.type === 'SAVING').map(t => t.amt));
+  $('#akun-info').innerHTML = `<div class="avatar">${esc(ACCOUNT_NAME[0])}</div><h2 class="acc">${esc(ACCOUNT_NAME)}</h2>
+    <div class="acc-stats"><div><small>Total Expenses</small><b>${rp(sum(E.map(t => t.amt)))}</b></div><div><small>Total Saving</small><b>${rp(sv)}</b></div><div><small>Jumlah Transaksi</small><b>${T.length}</b></div></div>`;
+  const cm = {}; E.forEach(t => cm[t.needs] = (cm[t.needs] || 0) + t.amt);
+  const ce = Object.entries(cm).sort((a, b) => b[1] - a[1]);
+  chart('akunCat', { type: 'bar', data: { labels: ce.map(e => e[0]), datasets: [{ label: 'Pengeluaran', data: ce.map(e => e[1]), backgroundColor: ce.map((_, i) => COLORS[i % COLORS.length]) }] },
+    options: { indexAxis: 'y', plugins: { ...TIP, legend: { display: false } } } });
+  const mm = Array(12).fill(0); E.filter(t => t.m >= 0 && (t.y === null || t.y === state.year)).forEach(t => mm[t.m] += t.amt);
+  chart('akunMonth', { type: 'bar', data: { labels: SHORT, datasets: [{ label: 'Pengeluaran', data: mm, backgroundColor: '#FF8A1F' },
+    { type: 'line', label: 'Budget', data: MONTHS.map((_, i) => budgetFor(state.year, i).total), borderColor: '#F93976', tension: .2 }] }, options: { plugins: TIP } });
+}
+
+/* ---------- Modal input ---------- */
+function openModal() {
+  $('#needs').innerHTML = '<option value="" disabled selected>Pilih Kategori...</option>' + [...new Set([...categories(), 'LAINNYA'])].map(c => `<option>${esc(c)}</option>`).join('');
+  $('#date').value = new Date(Date.now() - now.getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
+  $('#modal').hidden = false; $('#nav-input').classList.add('active');
+}
+function closeModal() { $('#modal').hidden = true; $('#nav-input').classList.remove('active'); }
+$('#nav-input').addEventListener('click', openModal);
+$('#close-modal').addEventListener('click', closeModal);
+$('#modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+$$('.nav-item[data-view]').forEach(b => b.addEventListener('click', () => { closeModal(); setView(b.dataset.view); }));
+
+$('#transaction-form').addEventListener('submit', e => {
+  e.preventDefault();
+  const btn = $('#btn-submit'); btn.disabled = true; btn.textContent = 'Saving...';
+  const d = { action: 'addTransaction', tanggal: $('#date').value, needs: $('#needs').value.toUpperCase(), nominal: $('#amount').value, keterangan: $('#description').value, category: $('#category').value };
+  post(d).then(() => { globalData.push(d); e.target.reset(); closeModal(); toast('Transaksi tersimpan'); render(); setTimeout(loadDashboardData, 1500); })
+    .catch(() => toast('Gagal menyimpan, coba lagi'))
+    .finally(() => { btn.disabled = false; btn.textContent = 'Save Transaction'; });
+});
+
+/* ---------- Ambil data ---------- */
+function loadDashboardData() {
+  fetch(SCRIPT_URL).then(r => r.json()).then(res => {
+    if (res.status !== 'sukses') throw res;
+    if (!res.budgetData) console.warn('Apps Script tidak mengirim budgetData: deploy ulang sebagai versi baru.');
+    globalData = res.data || []; globalBudget = res.budgetData || [];
+    backendCats = Array.isArray(res.categories) ? res.categories.map(c => String(c).toUpperCase()) : null;
+    console.log('[Budget]', globalBudget, backendCats);
+    buildPeriod(); render();
+  }).catch(err => { console.error('Gagal mengambil data:', err); toast('Gagal memuat data'); });
+}
+
+$('#acc-name').textContent = ACCOUNT_NAME;
+buildPeriod(); setView('home'); loadDashboardData();
