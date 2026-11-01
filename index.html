@@ -24,6 +24,7 @@
         <div class="budget-header"><h3>Recent Budget</h3><span id="progress-percentage" class="text-primary">0%</span></div>
         <h2 id="recent-budget">Rp0</h2>
         <div class="progress-track"><div class="progress-fill" id="budget-progress"></div></div>
+        <p class="daily" id="daily-left"></p>
       </div>
     </section>
     <p class="note" id="budget-note" hidden>Budget bulan ini belum ditemukan. Atur di menu Budget (atau cek Apps Script sudah mengirim budgetData).</p>
@@ -64,16 +65,18 @@
 <!-- MODAL INPUT -->
 <div class="modal-overlay" id="modal" hidden>
   <div class="modal">
-    <div class="budget-header"><h3>Input New Transaction</h3><button class="icon-btn" id="close-modal" aria-label="Tutup">✕</button></div>
+    <div class="budget-header"><h3 id="modal-title">Input New Transaction</h3><button class="icon-btn" id="close-modal" aria-label="Tutup">✕</button></div>
+    <div class="chips" id="quick-chips"></div>
     <form id="transaction-form">
       <div class="form-grid">
         <div class="input-group"><label>Date</label><input type="date" id="date" required></div>
         <div class="input-group"><label>Needs</label><select id="needs" required></select></div>
         <div class="input-group"><label>Amount</label><input type="number" id="amount" inputmode="numeric" placeholder="Cth: 50000" required></div>
-        <div class="input-group"><label>Description</label><input type="text" id="description" placeholder="Cth: Makan Siang" required></div>
+        <div class="input-group"><label>Description</label><input type="text" id="description" list="desc-list" autocomplete="off" placeholder="Cth: Makan Siang" required><datalist id="desc-list"></datalist></div>
         <div class="input-group"><label>Category</label><select id="category" required><option value="EXPENSES">EXPENSES</option><option value="SAVING">SAVING</option></select></div>
       </div>
       <button type="submit" id="btn-submit" class="btn-submit">Save Transaction</button>
+      <button type="button" id="btn-delete" class="btn-danger" hidden>Hapus Transaksi</button>
     </form>
   </div>
 </div>
