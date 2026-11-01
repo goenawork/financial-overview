@@ -198,7 +198,7 @@ $('#budget-card').addEventListener('click', e => {
 /* ---------- AKUN ---------- */
 function renderAkun() {
   const T = txs(), E = T.filter(t => t.type === 'EXPENSES'), sv = sum(T.filter(t => t.type === 'SAVING').map(t => t.amt));
-  $('#akun-info').innerHTML = `<div class="avatar">${esc(ACCOUNT_NAME[0])}</div><h2 class="acc">${esc(ACCOUNT_NAME)}</h2>
+  $('#akun-info').innerHTML = `<img class="avatar" src="avatar.jpg" alt="${esc(ACCOUNT_NAME)}" onerror="this.outerHTML='<div class=&quot;avatar&quot;>${esc(ACCOUNT_NAME[0])}</div>'"><h2 class="acc">${esc(ACCOUNT_NAME)}</h2>
     <div class="acc-stats"><div><small>Total Expenses</small><b>${rp(sum(E.map(t => t.amt)))}</b></div><div><small>Total Saving</small><b>${rp(sv)}</b></div><div><small>Jumlah Transaksi</small><b>${T.length}</b></div></div>`;
   const cm = {}; E.forEach(t => cm[t.needs] = (cm[t.needs] || 0) + t.amt);
   const ce = Object.entries(cm).sort((a, b) => b[1] - a[1]);
