@@ -97,3 +97,11 @@ td{font-weight:500}
   td:first-child::before{content:none}
   .mini{flex:1;width:auto;margin:0 0 0 auto;max-width:120px}
 }
+
+/* Edit transaksi, chip cepat, sisa harian */
+.tx{cursor:pointer}.tx:active{background:var(--bg-color)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 16px}
+.chip{border:1px solid var(--border-color);background:#fff;border-radius:16px;padding:6px 12px;font:inherit;font-size:12px;cursor:pointer}
+.chip:active{border-color:var(--accent);color:var(--accent)}
+.btn-danger{width:100%;margin-top:10px;padding:12px;background:#fff;color:var(--primary-color);border:1px solid var(--primary-color);border-radius:8px;font-size:15px;font-weight:600;cursor:pointer}
+.daily{margin-top:10px;font-size:13px;color:var(--text-muted)}
