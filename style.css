@@ -105,3 +105,4 @@ td{font-weight:500}
 .chip:active{border-color:var(--accent);color:var(--accent)}
 .btn-danger{width:100%;margin-top:10px;padding:12px;background:#fff;color:var(--primary-color);border:1px solid var(--primary-color);border-radius:8px;font-size:15px;font-weight:600;cursor:pointer}
 .daily{margin-top:10px;font-size:13px;color:var(--text-muted)}
+img.avatar{object-fit:cover;display:block}
