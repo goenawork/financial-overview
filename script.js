@@ -115,8 +115,8 @@ function renderHome() {
   $('#budget-progress').style.width = Math.min(pct, 100) + '%';
   const dim = new Date(state.year, state.month + 1, 0).getDate(), td = new Date(), left = b.total - total;
   const cur = td.getFullYear() === state.year && td.getMonth() === state.month, dl = dim - td.getDate() + 1;
-  $('#daily-left').textContent = !b.found ? '' : left < 0 ? 'Melebihi budget ' + rp(-left)
-    : cur ? `Sisa ${rp(Math.floor(left / dl))}/hari untuk ${dl} hari lagi` : `Rata-rata ${rp(Math.round(total / dim))}/hari`;
+$('#daily-left').textContent = !b.found ? '' : left < 0 ? 'Over budget by ' + rp(-left)
+    : cur ? `${rp(Math.floor(left / dl))}/day left for ${dl} more day${dl > 1 ? 's' : ''}` : `Average ${rp(Math.round(total / dim))}/day`;
   const pc = pct >= 100 ? '#ff5252' : pct >= 75 ? '#ff8a1f' : '#00b894';
   $('#budget-progress').style.background = pc; $('#progress-percentage').style.color = pc;
   const nt = $('#budget-note'); nt.hidden = b.found;
