@@ -1,4 +1,4 @@
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwGoQq322zZQHRyjheIF-baaC2k9e-iUHMXgLd2aLR1j5rBrsCo531oezkh5d0Mbb6S/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyxQ3yV4ADGlTJGL7SOdkFVRdkKXTC4CpnWM0c8ZbjX-duAuYftZHnHiqcTXHsvSUnO/exec';
 const ACCOUNT_NAME = 'Aang Gunawan';
 const MONTHS = ['JANUARI','FEBRUARI','MARET','APRIL','MEI','JUNI','JULI','AGUSTUS','SEPTEMBER','OKTOBER','NOVEMBER','DESEMBER'];
 const SHORT = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
@@ -302,3 +302,6 @@ function loadDashboardData() {
 
 $('#acc-name').textContent = ACCOUNT_NAME;
 buildPeriod(); setView('home'); loadDashboardData();
+
+// PWA: daftarkan service worker (hanya jalan lewat https atau localhost)
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(e => console.warn('SW gagal:', e));
