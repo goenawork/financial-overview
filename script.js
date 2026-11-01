@@ -1,4 +1,4 @@
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwGoQq322zZQHRyjheIF-baaC2k9e-iUHMXgLd2aLR1j5rBrsCo531oezkh5d0Mbb6S/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyxQ3yV4ADGlTJGL7SOdkFVRdkKXTC4CpnWM0c8ZbjX-duAuYftZHnHiqcTXHsvSUnO/exec';
 const ACCOUNT_NAME = 'Aang Gunawan';
 const MONTHS = ['JANUARI','FEBRUARI','MARET','APRIL','MEI','JUNI','JULI','AGUSTUS','SEPTEMBER','OKTOBER','NOVEMBER','DESEMBER'];
 const SHORT = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
@@ -112,7 +112,13 @@ function renderHome() {
   $('#recent-budget').textContent = rp(b.total - total);
   $('#progress-percentage').textContent = pct + '%';
   $('#budget-progress').style.width = Math.min(pct, 100) + '%';
-  $('#budget-note').hidden = b.found;
+  const nt = $('#budget-note'); nt.hidden = b.found;
+  if (!b.found) {
+    const r0 = globalBudget[0];
+    nt.textContent = 'Budget bulan ini belum ditemukan. Baris budget terbaca: ' + globalBudget.length +
+      (r0 ? '; kolom: ' + Object.keys(r0).join(', ') + '; contoh month: "' + (pick(r0, ['month', 'bulan']) ?? '(tidak ada kolom month)') + '"'
+          : ' (kosong: cek nama tab BUDGET dan pastikan header ada di baris 1)');
+  }
 
   const ce = Object.entries(cm).sort((a, b) => b[1] - a[1]); // urut nominal terbesar
   chart('donutChart', { type: 'doughnut', data: { labels: ce.map(e => e[0]), datasets: [{ data: ce.map(e => e[1]), backgroundColor: ce.map((_, i) => COLORS[i % COLORS.length]), borderWidth: 0 }] },
