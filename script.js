@@ -4,7 +4,7 @@ const MONTHS = ['JANUARI','FEBRUARI','MARET','APRIL','MEI','JUNI','JULI','AGUSTU
 const SHORT = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
 const TOK = {JAN:0,FEB:1,MAR:2,APR:3,MEI:4,MAY:4,JUN:5,JUL:6,AGU:7,AGT:7,AUG:7,SEP:8,SEPT:8,OKT:9,OCT:9,NOV:10,NOP:10,DES:11,DEC:11};
 const DEFAULT_CATS = ['BBM','JAJAN','MAKAN','MONTHLY NEED','KUOTA','KEPERLUAN'];
-const RESERVED = ['month','bulan','year','tahun','budget','total','difference','selisih','sisa'];
+const RESERVED = ['month','bulan','year','tahun','budget','total','difference','selisih','sisa','row'];
 const COLORS = ['#F93976','#FF5A5F','#FF7E67','#FF9F70','#FFBC7A','#FFD884','#F48C8C','#FF8A1F'];
 const TIP = { tooltip: { callbacks: { label: c => ' ' + (c.dataset.label || c.label) + ': ' + rp(c.raw) } } };
 
@@ -21,6 +21,7 @@ let globalData = [], globalBudget = [], backendCats = null;
 const now = new Date();
 const state = { view: 'home', year: now.getFullYear(), month: now.getMonth() };
 const charts = {};
+let editing = null, quickList = [];
 
 /* ---------- Helper tanggal & data ---------- */
 function monthIdx(v) {
@@ -43,10 +44,10 @@ function parseDate(raw) {
   return loc(new Date(s));
 }
 function txs() {
-  return globalData.map(r => {
+  return globalData.map((r, i) => {
     const dt = parseDate(pick(r, ['tanggal', 'date'])) || { y: null, m: -1, d: 0 };
     const c = String(pick(r, ['category', 'kategori']) || '').toUpperCase();
-    return { ...dt, needs: String(pick(r, ['needs']) || 'LAINNYA').toUpperCase(), desc: pick(r, ['keterangan', 'description', 'deskripsi']) || '',
+    return { ...dt, i, needs: String(pick(r, ['needs']) || 'LAINNYA').toUpperCase(), desc: pick(r, ['keterangan', 'description', 'deskripsi']) || '',
       amt: num(pick(r, ['nominal', 'amount'])), type: /SAVING|TABUNGAN/.test(c) ? 'SAVING' : (/EXPENSES|PENGELUARAN/.test(c) ? 'EXPENSES' : '') };
   });
 }
@@ -112,6 +113,12 @@ function renderHome() {
   $('#recent-budget').textContent = rp(b.total - total);
   $('#progress-percentage').textContent = pct + '%';
   $('#budget-progress').style.width = Math.min(pct, 100) + '%';
+  const dim = new Date(state.year, state.month + 1, 0).getDate(), td = new Date(), left = b.total - total;
+  const cur = td.getFullYear() === state.year && td.getMonth() === state.month, dl = dim - td.getDate() + 1;
+  $('#daily-left').textContent = !b.found ? '' : left < 0 ? 'Melebihi budget ' + rp(-left)
+    : cur ? `Sisa ${rp(Math.floor(left / dl))}/hari untuk ${dl} hari lagi` : `Rata-rata ${rp(Math.round(total / dim))}/hari`;
+  const pc = pct >= 100 ? '#ff5252' : pct >= 75 ? '#ff8a1f' : '#00b894';
+  $('#budget-progress').style.background = pc; $('#progress-percentage').style.color = pc;
   const nt = $('#budget-note'); nt.hidden = b.found;
   if (!b.found) {
     const r0 = globalBudget[0];
@@ -146,7 +153,7 @@ function renderTx() {
   T.forEach(t => {
     if (t.d !== last) { last = t.d; html += `<div class="tx-day">${new Date(t.y || state.year, t.m, t.d).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</div>`; }
     const s = t.type === 'SAVING';
-    html += `<div class="tx"><div><b>${esc(t.desc)}</b><small>${esc(t.needs)} · ${t.type || '-'}</small></div><span class="${s ? 'pos' : 'neg'}">${s ? '+' : '-'}${rp(t.amt)}</span></div>`;
+    html += `<div class="tx" data-i="${t.i}"><div><b>${esc(t.desc)}</b><small>${esc(t.needs)} · ${t.type || '-'}</small></div><span class="${s ? 'pos' : 'neg'}">${s ? '+' : '-'}${rp(t.amt)}</span></div>`;
   });
   $('#tx-list').innerHTML = html || '<p class="note">Belum ada transaksi di bulan ini.</p>';
 }
@@ -203,13 +210,69 @@ function renderAkun() {
 }
 
 /* ---------- Modal input ---------- */
-function openModal() {
+function openModal(ev) {
+  editing = typeof ev === 'number' ? ev : null; $('#transaction-form').reset();
   $('#needs').innerHTML = '<option value="" disabled selected>Pilih Kategori...</option>' + [...new Set([...categories(), 'LAINNYA'])].map(c => `<option>${esc(c)}</option>`).join('');
   $('#date').value = new Date(Date.now() - now.getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
+  const et = editing === null ? null : txs()[editing];
+  $('#modal-title').textContent = et ? 'Edit Transaction' : 'Input New Transaction';
+  $('#btn-delete').hidden = !et; $('#quick-chips').hidden = !!et;
+  if (et) {
+    ensureNeeds(et.needs);
+    if (et.m >= 0) $('#date').value = `${et.y || state.year}-${pad(et.m + 1)}-${pad(et.d)}`;
+    $('#needs').value = et.needs; $('#amount').value = et.amt; $('#description').value = et.desc; $('#category').value = et.type || 'EXPENSES';
+  } else renderQuick();
   $('#modal').hidden = false; $('#nav-input').classList.add('active');
 }
-function closeModal() { $('#modal').hidden = true; $('#nav-input').classList.remove('active'); }
-$('#nav-input').addEventListener('click', openModal);
+function closeModal() { editing = null; $('#modal').hidden = true; $('#nav-input').classList.remove('active'); }
+$('#nav-input').addEventListener('click', () => openModal());
+$('#tx-list').addEventListener('click', e => { const t = e.target.closest('[data-i]'); if (t) openModal(+t.dataset.i); });
+
+function ensureNeeds(n) { if (![...$('#needs').options].some(o => o.value === n)) $('#needs').add(new Option(n)); }
+function quickItems() {
+  const m = {};
+  txs().forEach(t => {
+    if (t.type !== 'EXPENSES' || !t.desc) return;
+    const name = String(t.desc).replace(/\s*\([^)]*\)\s*$/, '').trim(), k = name.toLowerCase(); if (!k) return;
+    const e = m[k] || (m[k] = { n: 0 }); e.n++; Object.assign(e, { name, needs: t.needs, amt: t.amt, cat: t.type });
+  });
+  return Object.values(m).sort((a, b) => b.n - a.n);
+}
+function renderQuick() {
+  quickList = quickItems();
+  $('#desc-list').innerHTML = quickList.map(e => `<option value="${esc(e.name)}">`).join('');
+  $('#quick-chips').innerHTML = quickList.slice(0, 6).map((e, i) => `<button type="button" class="chip" data-q="${i}">${esc(e.name)} · ${rp(e.amt)}</button>`).join('');
+}
+$('#quick-chips').addEventListener('click', ev => {
+  const b = ev.target.closest('[data-q]'); if (!b) return;
+  const e = quickList[+b.dataset.q]; ensureNeeds(e.needs);
+  $('#description').value = e.name; $('#needs').value = e.needs; $('#amount').value = e.amt; $('#category').value = e.cat;
+});
+$('#description').addEventListener('change', ev => {
+  const e = quickList.find(x => x.name.toLowerCase() === ev.target.value.trim().toLowerCase());
+  if (!e || editing !== null) return;
+  ensureNeeds(e.needs); if (!$('#amount').value) $('#amount').value = e.amt; if (!$('#needs').value) $('#needs').value = e.needs;
+});
+
+/* Edit & hapus transaksi */
+const matchOf = r => ({ needs: pick(r, ['needs']), nominal: pick(r, ['nominal', 'amount']), keterangan: pick(r, ['keterangan', 'description', 'deskripsi']) });
+function setField(r, names, val) { const k = Object.keys(r).find(k => names.includes(norm(k))); r[k === undefined ? names[0] : k] = val; }
+function saveEdit(d, btn) {
+  const r = globalData[editing]; d.action = 'editTransaction'; d.row = r._row; d.match = matchOf(r);
+  post(d).then(() => {
+    setField(r, ['tanggal', 'date'], d.tanggal); setField(r, ['needs'], d.needs); setField(r, ['nominal', 'amount'], d.nominal);
+    setField(r, ['keterangan', 'description', 'deskripsi'], d.keterangan); setField(r, ['category', 'kategori'], d.category);
+    closeModal(); toast('Transaksi diperbarui'); render(); setTimeout(loadDashboardData, 1500);
+  }).catch(() => toast('Gagal menyimpan, coba lagi'))
+    .finally(() => { btn.disabled = false; btn.textContent = 'Save Transaction'; });
+}
+$('#btn-delete').addEventListener('click', () => {
+  if (editing === null || !confirm('Hapus transaksi ini?')) return;
+  const r = globalData[editing];
+  post({ action: 'deleteTransaction', row: r._row, match: matchOf(r) }).then(() => {
+    globalData.splice(editing, 1); closeModal(); toast('Transaksi dihapus'); render(); setTimeout(loadDashboardData, 1500);
+  }).catch(() => toast('Gagal menghapus'));
+});
 $('#close-modal').addEventListener('click', closeModal);
 $('#modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
@@ -219,6 +282,7 @@ $('#transaction-form').addEventListener('submit', e => {
   e.preventDefault();
   const btn = $('#btn-submit'); btn.disabled = true; btn.textContent = 'Saving...';
   const d = { action: 'addTransaction', tanggal: $('#date').value, needs: $('#needs').value.toUpperCase(), nominal: $('#amount').value, keterangan: $('#description').value, category: $('#category').value };
+  if (editing !== null) return saveEdit(d, btn);
   post(d).then(() => { globalData.push(d); e.target.reset(); closeModal(); toast('Transaksi tersimpan'); render(); setTimeout(loadDashboardData, 1500); })
     .catch(() => toast('Gagal menyimpan, coba lagi'))
     .finally(() => { btn.disabled = false; btn.textContent = 'Save Transaction'; });
