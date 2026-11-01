@@ -1,6 +1,6 @@
 {
   "name": "Financial Dashboard",
-  "short_name": "Keuangan",
+  "short_name": "Financial Overview",
   "description": "Catatan finansial pribadi",
   "start_url": "./",
   "scope": "./",
